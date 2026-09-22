@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pooldino"
+version = "0.1.0"
+description = "Learned spatial pooling for representation autoencoders"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "absl-py", "albumentationsx>=2.0.12", "chex", "dacite>=1.9.2", "datasets>=3.6.0",
+    "einops>=0.8.1", "filelock", "flax==0.12.5", "grain>=0.2.15", "h5py", "huggingface-hub",
+    "jax==0.8.1", "jmp>=0.0.4", "lpips-nnx>=0.1.0", "matplotlib>=3.10.7",
+    "numpy>=2.3.3", "opencv-python-headless>=4.11.0.86", "optax>=0.2.6",
+    "orbax-checkpoint>=0.11.32", "pandas>=2.3.3", "pillow", "requests",
+    "scikit-learn>=1.8.0", "scipy", "tensorflow-datasets>=4.9.9",
+    "torch", "torchvision", "tqdm>=4.67.1", "transformers==4.57.1",
+    "tyro>=0.9.35", "wandb>=0.22.3",
+]
+
+[project.optional-dependencies]
+cuda = ["jax[cuda12]==0.8.1; sys_platform == 'linux'"]
+metrics = ["tensorflow; sys_platform == 'linux'", "torch-fidelity"]
+
+[dependency-groups]
+dev = ["pytest>=9.0.2", "ruff"]
+
+[tool.setuptools.packages.find]
+include = ["pooldino*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }
+torchvision = { index = "pytorch-cpu" }
