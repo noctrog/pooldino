@@ -1,6 +1,12 @@
 # PoolDINO
 
-Anonymous standalone implementation of learned spatial pooling for representation autoencoders. The package contains RGB decoder and generator training, sampling, classification probes, dense prediction, and pooling-operator analysis.
+**Pooling Representation Autoencoders for Efficient Diffusion**
+
+Ramón Calvo-González · Youssef Saied · François Fleuret
+
+[Paper](https://arxiv.org/abs/2610.09242) · [Project page](https://pooldino.ramoncalvo.com) · [Hugging Face models](https://huggingface.co/noctrog/pooldino)
+
+Implementation of PoolDINO, a learned spatial pooling method for representation autoencoders. The package contains RGB decoder and generator training, sampling, classification probes, dense prediction, and pooling-operator analysis.
 
 ## Installation
 
@@ -15,7 +21,7 @@ For CPU-only development, use `uv sync --locked`. The `metrics` extra includes T
 
 ## Data and pretrained weights
 
-No images, trained checkpoints, private paths, or experiment logs are bundled.
+No images, trained checkpoints, private paths, or experiment logs are bundled. Pretrained PoolDINO checkpoints and download instructions are available on [Hugging Face](https://huggingface.co/noctrog/pooldino).
 
 - Prepare ImageNet-1K as TFDS `imagenet2012`, and set `TFDS_DATA_DIR` to its root.
   Classification probes can also use ImageFolder `train/` and `val/` splits.
@@ -131,4 +137,18 @@ uv run pytest -q
 uv run ruff check --select F821,F822,F823 pooldino tests scripts
 ```
 
-Tests use small models and synthetic data; they do not reproduce full training runs. See [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md) for validation status and remaining release checks, and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for upstream attribution. This repository has no public remote or imported history.
+Tests use small models and synthetic data; they do not reproduce full training runs.
+
+## Citation
+
+```bibtex
+@misc{calvogonzález2026poolingrepresentationautoencodersefficient,
+      title={Pooling Representation Autoencoders for Efficient Diffusion},
+      author={Ramón Calvo-González and Youssef Saied and François Fleuret},
+      year={2026},
+      eprint={2610.09242},
+      archivePrefix={arXiv},
+      primaryClass={cs.CV},
+      url={https://arxiv.org/abs/2610.09242},
+}
+```
