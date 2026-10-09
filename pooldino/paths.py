@@ -4,6 +4,25 @@ import json
 import os
 from pathlib import Path
 
+from pooldino.checkpoints import RELEASED_DECODERS
+
+
+def released_decoder_artifact_identity(path: Path) -> tuple[str, ...] | None:
+    """Identify known Hub decoder runs independently of their download root.
+
+    Only the published run directories and their standard statistics file are
+    recognized. Unknown experiments, nested paths and other filenames retain
+    the existing stricter path checks. Callers still validate step, EMA, profile,
+    configuration hash and statistics hash; this never edits checkpoint bytes.
+    """
+    suffix = ()
+    if path.name == "pooled_latent_stats.npz":
+        path = path.parent
+        suffix = ("pooled_latent_stats.npz",)
+    if path.parent.name == "pooled-decoder" and path.name in RELEASED_DECODERS:
+        return ("pooldino-release", "pooled-decoder", path.name, *suffix)
+    return None
+
 
 def remap_artifact_path(path: Path | str) -> str:
     """Apply an optional local prefix map to a checkpoint's recorded path.

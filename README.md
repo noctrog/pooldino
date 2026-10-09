@@ -14,10 +14,10 @@ Python 3.13 and Linux with CUDA 12 are the intended training environment. Instal
 [uv](https://docs.astral.sh/uv/) and run:
 
 ```bash
-uv sync --locked --extra cuda --extra metrics
+uv sync --extra cuda --extra metrics
 ```
 
-For CPU-only development, use `uv sync --locked`. The `metrics` extra includes TensorFlow on Linux for ADM evaluation and `torch-fidelity` for reconstruction FID. PyTorch uses CPU wheels; model training and sampling use JAX on the GPU. The optional `raev2_fd` metric backend additionally requires the `fd_evaluator` package distributed with the public RAEv2 evaluation setup; it is not vendored. Sampling can run with `--generate-only` before metrics are computed separately. W&B logging is **off by default**. If enabled with `--use-wandb`, configure your own account through `WANDB_ENTITY` and `WANDB_API_KEY`. No account is embedded.
+For CPU-only development, use `uv sync`. The `metrics` extra includes TensorFlow on Linux for ADM evaluation and `torch-fidelity` for reconstruction FID. PyTorch uses CPU wheels; model training and sampling use JAX on the GPU. The optional `raev2_fd` metric backend additionally requires the `fd_evaluator` package distributed with the public RAEv2 evaluation setup; it is not vendored. Sampling can run with `--generate-only` before metrics are computed separately. W&B logging is **off by default**. If enabled with `--use-wandb`, configure your own account through `WANDB_ENTITY` and `WANDB_API_KEY`. No account is embedded.
 
 ## Data and pretrained weights
 
@@ -37,6 +37,33 @@ No images, trained checkpoints, private paths, or experiment logs are bundled. P
 
 Obtain datasets and pretrained weights under their respective terms. Model
 weights may be downloaded on the first training or evaluation invocation.
+
+## Download released checkpoints
+
+From the code checkout, select the configurations to download:
+
+```bash
+uv run python scripts/download_checkpoints.py --list
+uv run python scripts/download_checkpoints.py --models 2x2-80 --dry-run
+uv run python scripts/download_checkpoints.py --models 2x2-80
+```
+
+Available choices are `1x1-80`, `2x2-80`, `2x2-180`, `2x4-80`, `4x2-80`, and
+`4x4-80`. To fetch several at once, use e.g. `--models 2x2-80 2x2-180 2x4-80`.
+The 300-epoch 4×4 generator is not included in the current Hub release.
+
+The script downloads each selected generator, its matching decoder, and latent
+statistics into `checkpoints/pooldino/`, preserving the Hub directory layout.
+Use `--output-dir /path/to/checkpoints` to change the destination. Downloads use
+a pinned Hub revision, reuse shared decoders and existing files, and retain the
+complete training checkpoints. `--dry-run` checks availability and reports the
+total selected size without downloading weights. After downloading, the script
+prints the paths, checkpoint steps, and reported IG scale for each selection.
+
+The loader recognizes the published decoder directory names at any download
+root. No `POOLDINO_ARTIFACT_PATH_MAP` is needed for this layout. Checkpoint steps,
+EMA selection, configuration hashes, and statistics hashes are still checked;
+the downloaded checkpoint metadata is not rewritten.
 
 ## Two-stage training
 
@@ -76,16 +103,44 @@ Default outputs are `output/decoders/<experiment>` and `output/generators/<decod
 
 ## Sampling and guidance
 
+With the 80-epoch 2×2 checkpoint downloaded as above and ImageNet validation
+available through TFDS:
+
 ```bash
-uv run python scripts/export_raev2_condition_labels.py --help
 uv run python -m pooldino.eval.gfid_pooled_decoder_adm \
-  --generator-path output/generators/DECODER/GENERATOR \
-  --pooled-decoder-path output/decoders/DECODER \
-  --condition-labels-path /path/to/imagenet2012-validation-labels-tfds.npz \
-  --protocol raev2_ig --ig-scale 2.0 --generate-only
+  --generator-path checkpoints/pooldino/pooled-generator/repeatconv2x2-dinol-vitxl-raev2official-tfds \
+  --generator-step 100080 \
+  --pooled-decoder-path checkpoints/pooldino/pooled-decoder/repeatconv2x2-dinol-vitxl-raev2official-tfds \
+  --pooled-decoder-step 40032 \
+  --protocol raev2_ig --ig-scale 1.75 --generate-only
 ```
 
-`2.0` is an example scale, not a universal optimum. Select scales per checkpoint as in the paper. This named profile uses 100 Euler steps, seed 42, 50,000 images, EMA weights, and BF16 inference. Guidance uses noise-to-data time: IG is active on `[0, 0.9]`; explicit CFG uses `[0.3, 1]`. IG and CFG are neutral at scale 1. Add `--cfg-scale VALUE` to combine CFG with IG. For an unguided run, pass `--ig-scale 1 --cfg-scale 1`. The legacy encoder-reconstruction guidance remains
+The named evaluation protocols need the ImageNet validation class IDs in their
+original order, not necessarily the images. When no condition-label file is
+supplied, the evaluator reads them from the prepared TFDS dataset (or the
+configured RAEv2 Arrow dataset). To generate on a machine without ImageNet,
+first export the labels on a machine with the prepared TFDS dataset:
+
+```bash
+uv run python scripts/export_raev2_condition_labels.py \
+  --data-dir /path/to/tfds \
+  --output imagenet2012-validation-labels-tfds.npz
+```
+
+Copy that file to the generation machine and pass
+`--condition-labels-path /path/to/imagenet2012-validation-labels-tfds.npz`.
+Alternatively, place it directly in `checkpoints/pooldino/pooled-decoder/`
+for automatic discovery. The file is not included in the current release.
+An explicitly supplied missing file causes an error; it does not fall back to
+TFDS. Custom-protocol generation supplies balanced class IDs internally and
+does not require this file or ImageNet.
+
+`--generate-only` skips metric computation, **not** the full evaluation sample
+set: `raev2_ig` generates 50,000 images and overrides `--steps` and `--per-class`
+with its fixed settings. Batch size controls how many images are generated at
+once, not the total.
+
+`1.75` is the reported scale for this checkpoint, not a universal optimum. Select scales per checkpoint as in the paper. This named profile uses 100 Euler steps, seed 42, 50,000 images, EMA weights, and BF16 inference. Guidance uses noise-to-data time: IG is active on `[0, 0.9]`; explicit CFG uses `[0.3, 1]`. IG and CFG are neutral at scale 1. Add `--cfg-scale VALUE` to combine CFG with IG. For an unguided run, pass `--ig-scale 1 --cfg-scale 1`. The legacy encoder-reconstruction guidance remains
 available for appendix ablations; do not confuse its scale convention with IG.
 
 Time shifting is obtained from the generator configuration. Do not substitute a different shift or number of steps when comparing quality and throughput. Named profiles resolve their own settings and can override CLI defaults; inspect the saved `generation_config.txt` for the effective protocol.
@@ -122,7 +177,12 @@ explicit seeds and record all draws when reporting mean and standard deviation.
 
 ## Relocating existing checkpoints
 
-Always pass the new decoder/generator/statistics locations explicitly. Artifact checks retain the source step, EMA selection, configuration hash, and statistics hash. If an old checkpoint records a different directory layout, set an explicit prefix mapping rather than disabling these checks:
+Always pass the new decoder/generator/statistics locations explicitly. The
+published `pooled-decoder/<experiment>` directories and their standard
+`pooled_latent_stats.npz` files are recognized independently of the download
+root. Artifact checks retain the source step, EMA selection, configuration hash,
+and statistics hash. For other layouts or renamed runs, set an explicit prefix
+mapping rather than disabling these checks:
 
 ```bash
 export POOLDINO_ARTIFACT_PATH_MAP='{"/old/output/decoder":"/new/output/decoders"}'

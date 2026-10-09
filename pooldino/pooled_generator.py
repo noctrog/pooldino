@@ -17,7 +17,7 @@ from dacite import from_dict
 from flax import nnx
 
 from pooldino.models.transformer import set_attn_implementation
-from pooldino.paths import remap_artifact_path
+from pooldino.paths import released_decoder_artifact_identity, remap_artifact_path
 from pooldino.generator_config import GeneratorOptimConfig
 from pooldino.backbone import load_backbone
 from pooldino.decoder_config import ITEM_NAMES
@@ -229,10 +229,10 @@ def _canonical_artifact_path(path: Path | str) -> str:
 def _artifact_path_identity(path: Path | str) -> tuple[str, ...]:
     """Return a relocation-safe identity for a persisted artifact path.
 
-    Local PoolDINO artifacts are conventionally stored below an ``output``
-    directory.  Preserve that complete output-relative path while allowing the
-    checkout and home-directory prefix to change across workstations.  Paths
-    outside that convention, and remote URIs, remain exact matches.
+    Released decoder artifacts use their known Hub-relative run identity, so
+    downloading them to a different root requires no environment overrides.
+    Other local artifacts preserve the existing output-relative convention;
+    paths outside either convention, and remote URIs, remain exact matches.
     """
 
     path_str = remap_artifact_path(path).rstrip("/")
@@ -240,6 +240,8 @@ def _artifact_path_identity(path: Path | str) -> tuple[str, ...]:
         return ("uri", path_str)
 
     resolved = Path(path_str).expanduser().resolve()
+    if released_identity := released_decoder_artifact_identity(resolved):
+        return released_identity
     parts = resolved.parts
     output_indices = [index for index, part in enumerate(parts) if part == "output"]
     if output_indices:
